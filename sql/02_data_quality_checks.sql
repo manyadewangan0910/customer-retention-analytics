@@ -30,7 +30,7 @@ SELECT * from customers WHERE customer_city= ' ';
 
 #check invalid values
 SELECT * FROM order_items where price<0;
-to check  for negative values
+## to check  for negative values
 SELECT * from order_payments WHERE payment_value<0;
 
 #check for invalid dates

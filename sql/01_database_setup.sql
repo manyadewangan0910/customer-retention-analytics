@@ -92,3 +92,7 @@ CREATE TABLE order_items (
     FOREIGN KEY (seller_id)
         REFERENCES sellers(seller_id)
 );
+
+
+
+

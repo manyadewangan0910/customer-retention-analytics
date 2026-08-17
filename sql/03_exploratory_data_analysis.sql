@@ -181,6 +181,275 @@ WHERE o.order_delivered_customer_date IS NOT NULL
 GROUP BY c.customer_state
 ORDER BY average_delivery_days DESC
 LIMIT 1;
+## Which customer states have the highest order cancellation rate?
+SELECT
+    c.customer_state,
+    SUM(
+        CASE
+            WHEN o.order_status = 'canceled' THEN 1
+            ELSE 0
+        END
+    ) / COUNT(o.order_id) * 100 AS cancellation_rate
+FROM customers c
+JOIN orders o
+    ON c.customer_id = o.customer_id
+GROUP BY c.customer_state
+ORDER BY cancellation_rate DESC;
+
+## Which payment method is used most frequently?
+SELECT
+    payment_type,
+    COUNT(DISTINCT order_id) AS total_orders
+FROM order_payments
+GROUP BY payment_type
+ORDER BY total_orders DESC
+LIMIT 1;
+
+## Which payment method generated the highest total payment value?
+SELECT
+    payment_type,
+    SUM(payment_value) AS total_payment_value
+FROM order_payments
+GROUP BY payment_type
+ORDER BY total_payment_value DESC
+LIMIT 1;
+
+## Which product category has the highest average product price?
+SELECT
+    p.product_category_name,
+    AVG(oi.price) AS avg_price
+FROM products p
+JOIN order_items oi
+    ON oi.product_id = p.product_id
+GROUP BY p.product_category_name
+ORDER BY avg_price DESC
+LIMIT 1;
+
+## Which product category has the highest number of products sold?
+SELECT
+    p.product_category_name,
+    COUNT(oi.product_id) AS products_sold
+FROM order_items oi
+JOIN products p
+    ON oi.product_id = p.product_id
+GROUP BY p.product_category_name
+ORDER BY products_sold DESC
+LIMIT 1;
+
+## Which seller generated the highest total revenue?
+SELECT
+    seller_id,
+    SUM(price) AS total_revenue
+FROM order_items
+GROUP BY seller_id
+ORDER BY total_revenue DESC
+LIMIT 1;
+
+## Which seller has the highest number of orders?
+SELECT
+    seller_id,
+    COUNT(DISTINCT order_id) AS total_orders
+FROM order_items
+GROUP BY seller_id
+ORDER BY total_orders DESC
+LIMIT 1;
+
+## Which customer state has the highest average order value (AOV)?
+SELECT
+    c.customer_state,
+    SUM(oi.price) / COUNT(DISTINCT o.order_id) AS AOV
+FROM customers c
+JOIN orders o
+    ON c.customer_id = o.customer_id
+JOIN order_items oi
+    ON o.order_id = oi.order_id
+GROUP BY c.customer_state
+ORDER BY AOV DESC
+LIMIT 1;
+
+## How many customers placed more than one order?
+SELECT COUNT(*) AS total_repeat_customers
+FROM (
+    SELECT
+        c.customer_unique_id,
+        COUNT(o.order_id) AS total_orders
+    FROM customers c
+    JOIN orders o
+        ON c.customer_id = o.customer_id
+    GROUP BY c.customer_unique_id
+    HAVING total_orders > 1
+) AS repeat_customers;
+## What percentage of customers are repeat customers?
+	SELECT
+    rpt.total_repeat_customers,
+    total.total_unique_customers,
+    (rpt.total_repeat_customers / total.total_unique_customers) * 100
+        AS repeat_customer_rate
+FROM
+(
+    SELECT COUNT(*) AS total_repeat_customers
+    FROM (
+        SELECT
+            c.customer_unique_id,
+            COUNT(o.order_id) AS total_orders
+        FROM customers c
+        JOIN orders o
+            ON c.customer_id = o.customer_id
+        GROUP BY c.customer_unique_id
+        HAVING total_orders > 1
+    ) AS repeat_list
+) AS rpt
+CROSS JOIN
+(
+    SELECT COUNT(DISTINCT customer_unique_id) AS total_unique_customers
+    FROM customers
+) AS total;
+
+## Which order status has the highest number of orders?
+SELECT
+    order_status,
+    COUNT(order_id) AS total_orders
+FROM orders
+GROUP BY order_status
+ORDER BY total_orders DESC
+LIMIT 1;
+
+##Which customer state has the highest number of canceled orders?
+SELECT
+    customer_state,
+    SUM(
+        CASE
+            WHEN order_status = 'canceled' THEN 1
+            ELSE 0
+        END
+    ) AS cancelled_orders
+FROM customers c
+JOIN orders o
+    ON c.customer_id = o.customer_id
+GROUP BY customer_state
+ORDER BY cancelled_orders DESC
+LIMIT 1;
+
+## Which customer state has the highest number of unique customers?
+SELECT
+    customer_state,
+    COUNT(DISTINCT customer_unique_id) AS unique_customers
+FROM customers
+GROUP BY customer_state
+ORDER BY unique_customers DESC
+LIMIT 1;
+## Which customer state has the longest average delivery time?
+SELECT
+    c.customer_state,
+    AVG(
+        DATEDIFF(
+            o.order_delivered_customer_date,
+            o.order_purchase_timestamp
+        )
+    ) AS average_delivery_days
+FROM customers c
+JOIN orders o
+    ON c.customer_id = o.customer_id
+WHERE o.order_delivered_customer_date IS NOT NULL
+GROUP BY c.customer_state
+ORDER BY average_delivery_days DESC
+LIMIT 1;
+
+## Which seller generated the highest total revenue?
+
+SELECT
+    seller_id,
+    SUM(price) AS total_revenue
+FROM order_items
+GROUP BY seller_id
+ORDER BY total_revenue DESC
+LIMIT 1;
+
+##Which seller received the highest number of orders?
+SELECT
+    seller_id,
+    COUNT(DISTINCT order_id) AS total_orders
+FROM order_items
+GROUP BY seller_id
+ORDER BY total_orders DESC
+LIMIT 1;
+
+## Which product category has the highest number of products sold?
+SELECT
+    p.product_category_name,
+    COUNT(oi.product_id) AS products_sold
+FROM order_items oi
+JOIN products p
+    ON oi.product_id = p.product_id
+GROUP BY p.product_category_name
+ORDER BY products_sold DESC
+LIMIT 1;
+## Which product category has the highest average selling price?
+SELECT
+    p.product_category_name,
+    AVG(oi.price) AS avg_price
+FROM products p
+JOIN order_items oi
+    ON p.product_id = oi.product_id
+GROUP BY p.product_category_name
+ORDER BY avg_price DESC
+LIMIT 1;
+## Which payment type is used for the highest number of orders?
+SELECT
+    payment_type,
+    COUNT(DISTINCT order_id) AS total_orders
+FROM order_payments
+GROUP BY payment_type
+ORDER BY total_orders DESC
+LIMIT 1;
+
+## Which payment type generates the highest total payment value?
+SELECT
+    payment_type,
+    SUM(payment_value) AS total_payment_value
+FROM order_payments
+GROUP BY payment_type
+ORDER BY total_payment_value DESC
+LIMIT 1;
+## How many customers placed 1 order, 2 orders, 3 orders, etc.?
+SELECT
+    total_orders,
+    COUNT(*) AS number_of_customers
+FROM (
+    SELECT
+        customer_id,
+        COUNT(order_id) AS total_orders
+    FROM orders
+    GROUP BY customer_id
+) AS customer_orders
+GROUP BY total_orders
+ORDER BY total_orders;
+
+##Which month had the highest number of orders?
+SELECT
+    DATE_FORMAT(order_purchase_timestamp, '%Y-%m') AS month,
+    COUNT(order_id) AS total_orders
+FROM orders
+GROUP BY month
+ORDER BY total_orders DESC
+LIMIT 1;
+## How many orders were placed in each month?
+SELECT
+    DATE_FORMAT(order_purchase_timestamp, '%Y-%m') AS month,
+    COUNT(order_id) AS total_orders
+FROM orders
+GROUP BY month
+ORDER BY month;
+## What is the average order value (AOV) for each month?
+SELECT
+    DATE_FORMAT(o.order_purchase_timestamp, '%Y-%m') AS month,
+    SUM(oi.price) / COUNT(DISTINCT o.order_id) AS AOV
+FROM orders o
+JOIN order_items oi
+    ON o.order_id = oi.order_id
+GROUP BY month
+ORDER BY month;
+
 
 
 

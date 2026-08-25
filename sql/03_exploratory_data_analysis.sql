@@ -450,10 +450,245 @@ JOIN order_items oi
 GROUP BY month
 ORDER BY month;
 
+## What percentage of total payment value comes from each payment type?
+SELECT
+    op.payment_type,
+    SUM(op.payment_value) AS total_payment_value,
+    SUM(op.payment_value) / MAX(total.grand_total) * 100 AS payment_share
+FROM order_payments op
+CROSS JOIN (
+    SELECT SUM(payment_value) AS grand_total
+    FROM order_payments
+) AS total
+GROUP BY op.payment_type
+ORDER BY payment_share DESC;
 
+## How does total payment value change month by month?
+SELECT
+    DATE_FORMAT(o.order_purchase_timestamp, '%Y-%m') AS month,
+    SUM(op.payment_value) AS total_payment_value
+FROM orders o
+JOIN order_payments op
+    ON o.order_id = op.order_id
+GROUP BY month
+ORDER BY month;
 
+##Which month had the highest percentage of repeat customers?
+SELECT
+    rpt.month,
+    rpt.repeat_customers,
+    total.total_customers,
+    rpt.repeat_customers / total.total_customers * 100
+        AS repeat_customer_rate
 
+FROM
+(
+SELECT
+    month,
+    COUNT(DISTINCT customer_unique_id) AS repeat_customers
+FROM (
+    SELECT
+        COUNT(o.order_id) AS total_orders,
+        c.customer_unique_id,
+        DATE_FORMAT(o.order_purchase_timestamp, '%Y-%m') AS month
+    FROM customers c
+    JOIN orders o
+        ON c.customer_id = o.customer_id
+    GROUP BY c.customer_unique_id, month
+    HAVING COUNT(o.order_id) > 1
+) AS repeat_list
+GROUP BY month
+) as rpt join 
+(select count(DISTINCT c.customer_unique_id) as total_customers, 
+DATE_FORMAT(o.order_purchase_timestamp,'%Y-%m') as month from 
+customers c join orders o on c.customer_id=o.customer_id 
+group by month) as total 
 
+ON rpt.month = total.month
+
+ORDER BY repeat_customer_rate DESC
+LIMIT 1;
+
+## Which month had the highest cancellation rate?
+
+SELECT
+    DATE_FORMAT(order_purchase_timestamp, '%Y-%m') AS month,
+    SUM(
+        CASE
+            WHEN order_status = 'canceled' THEN 1
+            ELSE 0
+        END
+    ) / COUNT(order_id) * 100 AS cancellation_rate
+FROM orders
+GROUP BY month
+ORDER BY cancellation_rate DESC
+LIMIT 1;
+
+## what percentage of customers made another purchase with in 90 days of their first purchase?
+SELECT
+    rpt.repeat_90_days,
+    total.total_unique_customers,
+    rpt.repeat_90_days / total.total_unique_customers * 100 AS retention_rate
+FROM
+(
+    SELECT
+        COUNT(DISTINCT temp.customer_unique_id) AS repeat_90_days
+    FROM
+    (
+        SELECT
+            fp.customer_unique_id,
+            fp.first_purchase,
+            o.order_purchase_timestamp AS later_order,
+            DATEDIFF(
+                o.order_purchase_timestamp,
+                fp.first_purchase
+            ) AS days_after_first
+        FROM
+        (
+            SELECT
+                c.customer_unique_id,
+                MIN(o.order_purchase_timestamp) AS first_purchase
+            FROM orders o
+            JOIN customers c
+                ON o.customer_id = c.customer_id
+            GROUP BY c.customer_unique_id
+        ) AS fp
+        JOIN customers c
+            ON fp.customer_unique_id = c.customer_unique_id
+        JOIN orders o
+            ON c.customer_id = o.customer_id
+        WHERE o.order_purchase_timestamp > fp.first_purchase
+    ) AS temp
+    WHERE temp.days_after_first <= 90
+) AS rpt
+
+CROSS JOIN
+
+(
+    SELECT
+        COUNT(DISTINCT c.customer_unique_id) AS total_unique_customers
+    FROM orders o
+    JOIN customers c
+        ON o.customer_id = c.customer_id
+) AS total;
+## Who are the top 3 customers by total product spending?
+SELECT
+    c.customer_unique_id,
+    SUM(oi.price) AS total_spending
+FROM customers c
+JOIN orders o
+    ON c.customer_id = o.customer_id
+JOIN order_items oi
+    ON o.order_id = oi.order_id
+GROUP BY c.customer_unique_id
+ORDER BY total_spending DESC
+LIMIT 3;
+
+## which month has highest AOV?
+SELECT
+    DATE_FORMAT(o.order_purchase_timestamp, '%Y-%m') AS month,
+    SUM(oi.price) AS total_value,
+    COUNT(DISTINCT o.order_id) AS total_orders,
+    SUM(oi.price) / COUNT(o.order_id) AS AOV
+FROM orders o
+JOIN order_items oi
+    ON o.order_id = oi.order_id
+GROUP BY month
+ORDER BY AOV DESC
+LIMIT 1;
+##Which product category generated the highest revenue?
+SELECT
+    p.product_category_name,
+    SUM(oi.price) AS revenue
+FROM order_items AS oi
+JOIN products p
+    ON oi.product_id = p.product_id
+GROUP BY p.product_category_name
+ORDER BY revenue DESC
+LIMIT 1;
+## Find the month with the highest number of orders.
+SELECT
+    COUNT(order_id) AS total_orders,
+    DATE_FORMAT(order_purchase_timestamp, '%Y-%m') AS month
+FROM orders
+GROUP BY month
+ORDER BY total_orders DESC
+LIMIT 1;
+## Find customers who placed orders in at least 3 different months.
+
+SELECT
+    c.customer_unique_id,
+    COUNT(DISTINCT DATE_FORMAT(o.order_purchase_timestamp, '%Y-%m')) AS total_months
+FROM customers c
+JOIN orders o
+    ON c.customer_id = o.customer_id
+GROUP BY c.customer_unique_id
+HAVING COUNT(DISTINCT DATE_FORMAT(o.order_purchase_timestamp, '%Y-%m')) >= 3;
+## Find the customer who placed the most orders.
+SELECT
+    c.customer_unique_id,
+    COUNT(o.order_id) AS total_orders
+FROM customers c
+JOIN orders o
+    ON c.customer_id = o.customer_id
+GROUP BY c.customer_unique_id
+ORDER BY total_orders DESC
+LIMIT 1;
+
+## Find the average number of orders placed by a customer.
+SELECT
+    c.customer_unique_id,
+    COUNT(o.order_id) AS total_orders
+FROM customers c
+JOIN orders o
+    ON c.customer_id = o.customer_id
+GROUP BY c.customer_unique_id
+ORDER BY total_orders DESC
+LIMIT 1;
+## Find the average number of orders placed by a customer.
+
+SELECT
+    AVG(temp.total_orders) AS avg_orders_per_customer
+FROM (
+    SELECT
+        c.customer_unique_id,
+        COUNT(o.order_id) AS total_orders
+    FROM customers c
+    JOIN orders o
+        ON c.customer_id = o.customer_id
+    GROUP BY c.customer_unique_id
+) AS temp;
+
+# Find customers whose total spending is higher than the average customer spending.
+SELECT
+    temp.customer_unique_id,
+    temp.total_spending
+FROM (
+    SELECT
+        c.customer_unique_id,
+        SUM(oi.price) AS total_spending
+    FROM customers c
+    JOIN orders o
+        ON c.customer_id = o.customer_id
+    JOIN order_items oi
+        ON o.order_id = oi.order_id
+    GROUP BY c.customer_unique_id
+) AS temp
+
+WHERE temp.total_spending > (
+    SELECT AVG(avg_temp.total_spending)
+    FROM (
+        SELECT
+            c.customer_unique_id,
+            SUM(oi.price) AS total_spending
+        FROM customers c
+        JOIN orders o
+            ON c.customer_id = o.customer_id
+        JOIN order_items oi
+            ON o.order_id = oi.order_id
+        GROUP BY c.customer_unique_id
+    ) AS avg_temp
+);
 
 
 

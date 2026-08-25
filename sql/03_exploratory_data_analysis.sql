@@ -689,6 +689,7 @@ WHERE temp.total_spending > (
         GROUP BY c.customer_unique_id
     ) AS avg_temp
 );
+## Find the top 3 product categories by number of orders.
 
 
 
